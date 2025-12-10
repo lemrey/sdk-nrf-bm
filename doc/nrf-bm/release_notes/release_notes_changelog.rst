@@ -76,6 +76,7 @@ Storage
 * :ref:`lib_storage`:
 
    Updated:
+     * The :c:func:`bm_storage_init` function to return an error when the instance is already initialized.
      * The :c:func:`bm_storage_write` and :c:func:`bm_storage_erase` functions to return ``-ENOMEM`` when out of memory, instead of ``-EIO``.
 
 Libraries

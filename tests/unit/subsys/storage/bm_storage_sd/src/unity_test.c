@@ -436,7 +436,6 @@ void test_bm_storage_write_queued(void)
 	TEST_ASSERT_EQUAL(0, err);
 }
 
-<<<<<<< HEAD
 void test_bm_storage_write_retry_queued(void)
 {
 	int err;
