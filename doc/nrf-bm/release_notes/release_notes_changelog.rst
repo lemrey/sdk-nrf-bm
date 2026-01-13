@@ -76,15 +76,13 @@ Storage
 * :ref:`lib_storage`:
 
    Added:
-     * The :c:func:`bm_storage_nvm_info_get` function to retrieve NVM information, such as the size of the program unit and other.
-     * The capability to automatically pad write operations up to the program unit.
-     * The :c:func:`bm_storage_nvm_info_get` function to retrieve NVM information, such as the size of the program unit and other.
+     * The capability to compile more than one backend.
 
    Updated:
      * The :c:func:`bm_storage_init` function to return an error when the instance is already initialized.
      * The SoftDevice, RRAM, and native_sim backends to support deinitialization.
-     * The :c:func:`bm_storage_write` and :c:func:`bm_storage_erase` functions to return ``-ENOMEM`` when out of memory, instead of ``-EIO``.
-     * The :c:func:`bm_storage_read`, :c:func:`bm_storage_write`, and :c:func:`bm_storage_erase` functions to return ``-EINVAL`` on alignment errors, instead of ``-EFAULT``.
+     * The SoftDevice, RRAM, and native_sim backends to support the erase operation.
+     * The SoftDevice backend to support chunking of write operations.
 
 Libraries
 =========

@@ -114,6 +114,19 @@ struct bm_storage;
 struct bm_storage_config;
 
 /**
+ * @brief Storage API implementation.
+ */
+struct bm_storage_api {
+	int (*init)(struct bm_storage *storage, const struct bm_storage_config *config);
+	int (*uninit)(struct bm_storage *storage);
+	int (*read)(const struct bm_storage *storage, uint32_t src, void *dest, uint32_t len);
+	int (*write)(const struct bm_storage *storage, uint32_t dest, const void *src, uint32_t len,
+		     void *ctx);
+	int (*erase)(const struct bm_storage *storage, uint32_t addr, uint32_t len, void *ctx);
+	bool (*is_busy)(const struct bm_storage *storage);
+};
+
+/**
  * @brief Storage instance.
  *
  * An instance is bound to an API implementation (backend) and the partition on which it operates.
@@ -123,6 +136,10 @@ struct bm_storage {
 	 * @brief Tells whether the instance is initialized.
 	 */
 	bool initialized;
+	/**
+	 * @brief API implementation.
+	 */
+	const struct bm_storage_api *api;
 	/**
 	 * @brief Information about the implementation-specific functionality and the non-volatile
 	 *        memory peripheral.
@@ -169,6 +186,10 @@ struct bm_storage_config {
 	 * @note If set to NULL, no events will be sent.
 	 */
 	bm_storage_evt_handler_t evt_handler;
+	/**
+	 * @brief API implementation.
+	 */
+	const struct bm_storage_api *api;
 	/**
 	 * @brief The beginning of the non-volatile memory region where this storage instance
 	 *        can operate.
