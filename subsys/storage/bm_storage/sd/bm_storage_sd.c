@@ -76,17 +76,20 @@ static inline bool is_aligned32(uint32_t addr)
 	return !(addr & 0x03);
 }
 
-static void event_send(const struct bm_storage_sd_op *op, bool is_sync, uint32_t result)
+static void event_send(const struct bm_storage_sd_op *op, uint32_t result)
 {
 	if (op->storage->evt_handler == NULL) {
 		/* Do nothing. */
 		return;
 	}
 
+	/* Dispatch mode is determined by SoftDevice state, not by context. */
+	enum bm_storage_evt_dispatch_type dispatch_type =
+		bm_storage_sd.sd_enabled ? BM_STORAGE_EVT_DISPATCH_ASYNC : BM_STORAGE_EVT_DISPATCH_SYNC;
+
 	struct bm_storage_evt evt = {
 		.id = BM_STORAGE_EVT_WRITE_RESULT,
-		.dispatch_type = (is_sync) ? BM_STORAGE_EVT_DISPATCH_SYNC :
-					BM_STORAGE_EVT_DISPATCH_ASYNC,
+		.dispatch_type = dispatch_type,
 		.result = result,
 		.addr = op->dest,
 		.src = op->src,
@@ -159,14 +162,10 @@ static void queue_process(void)
 	switch (ret) {
 	case NRF_SUCCESS:
 		/* The operation was accepted by the SoftDevice.
-		 * If the SoftDevice is enabled, wait for a system event.
-		 * Otherwise, the SoftDevice call is synchronous and will not send an event so we
-		 * simulate it.
+		 * If the SoftDevice is enabled, wait for a SoC event, otherwise simulate it.
 		 */
 		if (!bm_storage_sd.sd_enabled) {
-			bool is_sync = true;
-
-			bm_storage_sd_on_soc_evt(NRF_EVT_FLASH_OPERATION_SUCCESS, &is_sync);
+			bm_storage_sd_on_soc_evt(NRF_EVT_FLASH_OPERATION_SUCCESS, NULL);
 		}
 		break;
 	case NRF_ERROR_BUSY:
@@ -179,7 +178,7 @@ static void queue_process(void)
 		/* An error has occurred and we cannot proceed further with this operation.
 		 * Process the next operation in the queue.
 		 */
-		event_send(&bm_storage_sd.current_operation, true, -EIO);
+		event_send(&bm_storage_sd.current_operation, -EIO);
 		bm_storage_sd.operation_state = OP_NONE;
 		queue_process();
 		break;
@@ -372,12 +371,7 @@ void bm_storage_sd_on_soc_evt(uint32_t evt, void *ctx)
 		/* Load a new operation next */
 		bm_storage_sd.operation_state = OP_NONE;
 
-		/* We pass a pointer only when we call it manually for the synchronous
-		 * processing.
-		 */
-		bool is_sync = (ctx != NULL);
-
-		event_send(&bm_storage_sd.current_operation, is_sync,
+		event_send(&bm_storage_sd.current_operation,
 			   (evt == NRF_EVT_FLASH_OPERATION_SUCCESS) ? 0 : -ETIMEDOUT);
 	}
 
