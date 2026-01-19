@@ -277,7 +277,7 @@ int bm_storage_backend_write(const struct bm_storage *storage, uint32_t dest,
 
 	queued = queue_store(&op);
 	if (!queued) {
-		return -EIO;
+		return -ENOMEM;
 	}
 
 	queue_start();

@@ -67,6 +67,17 @@ Drivers
    * Updated to use the :ref:`lib_bm_gpiote` library.
    * Removed the `gpiote_inst` and `gpiote_inst_num` members from the :c:struct:`bm_lpuarte_config` struct.
 
+Subsystems
+==========
+
+Storage
+=======
+
+* :ref:`lib_storage`:
+
+   Updated:
+     * The :c:func:`bm_storage_write` and :c:func:`bm_storage_erase` functions to return ``-ENOMEM`` when out of memory, instead of ``-EIO``.
+
 Libraries
 =========
 

@@ -436,6 +436,7 @@ void test_bm_storage_write_queued(void)
 	TEST_ASSERT_EQUAL(0, err);
 }
 
+<<<<<<< HEAD
 void test_bm_storage_write_retry_queued(void)
 {
 	int err;
@@ -578,7 +579,7 @@ void test_bm_storage_write_queued_eio(void)
 	TEST_ASSERT_EQUAL(sizeof(buf), storage_event.len);
 }
 
-void test_bm_storage_write_eio(void)
+void test_bm_storage_write_enomem(void)
 {
 	int err;
 	uint8_t buf[BLOCK_SIZE];
@@ -610,7 +611,7 @@ void test_bm_storage_write_eio(void)
 	}
 
 	err = bm_storage_write(&storage, PARTITION_START, buf, sizeof(buf), NULL);
-	TEST_ASSERT_EQUAL(-EIO, err);
+	TEST_ASSERT_EQUAL(-ENOMEM, err);
 
 	for (size_t i = 0; i < CONFIG_BM_STORAGE_BACKEND_SD_QUEUE_SIZE + 1; i++) {
 		/* Each system events triggers the next operation in the queue */
