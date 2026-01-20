@@ -395,5 +395,7 @@ NRF_SDH_SOC_OBSERVER(sdh_soc, bm_storage_sd_on_soc_evt, NULL, HIGH);
 
 const struct bm_storage_info bm_storage_info = {
 	.program_unit = SD_WRITE_BLOCK_SIZE,
+	.erase_unit = SD_WRITE_BLOCK_SIZE,
+	.erase_value = 0xFF,
 	.no_explicit_erase = true
 };
