@@ -255,13 +255,7 @@ int bm_storage_backend_uninit(struct bm_storage *storage)
 int bm_storage_backend_read(const struct bm_storage *storage, uint32_t src, void *dest,
 			    uint32_t len)
 {
-	/* SoftDevice expects this alignment. */
-	if (!is_aligned32(src)) {
-		return -EFAULT;
-	}
-
-	/* src is expected to be 32-bit word-aligned. */
-	memcpy(dest, (uint32_t *)src, len);
+	memcpy(dest, UINT_TO_POINTER(src), len);
 
 	return 0;
 }
@@ -278,9 +272,9 @@ int bm_storage_backend_write(const struct bm_storage *storage, uint32_t dest,
 		.dest = dest,
 	};
 
-	/* SoftDevice expects this alignment. */
-	if (!is_aligned32((uint32_t)src) || !is_aligned32(dest)) {
-		return -EFAULT;
+	/* SoftDevice requires this alignment. */
+	if (!IS_ALIGNED(src, sizeof(uint32_t))) {
+		return -EINVAL;
 	}
 
 	queued = queue_store(&op);

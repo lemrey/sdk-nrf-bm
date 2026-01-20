@@ -82,6 +82,7 @@ Storage
      * The :c:func:`bm_storage_init` function to return an error when the instance is already initialized.
      * The SoftDevice, RRAM, and native_sim backends to support deinitialization.
      * The :c:func:`bm_storage_write` and :c:func:`bm_storage_erase` functions to return ``-ENOMEM`` when out of memory, instead of ``-EIO``.
+     * The :c:func:`bm_storage_read`, :c:func:`bm_storage_write`, and :c:func:`bm_storage_erase` functions to return ``-EINVAL`` on alignment errors, instead of ``-EFAULT``.
 
 Libraries
 =========

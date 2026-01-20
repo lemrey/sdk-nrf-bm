@@ -48,24 +48,38 @@ enum bm_storage_evt_dispatch_type {
  * @brief Storage event.
  */
 struct bm_storage_evt {
-	/* Event ID. */
+	/**
+	 * @brief Event identifier.
+	 */
 	enum bm_storage_evt_type id;
-	/* Specifies if the operation was performed synchronously or asynchronously. */
+	/**
+	 * @brief Whether the event was dispatched synchronously or asynchronously.
+	 */
 	enum bm_storage_evt_dispatch_type dispatch_type;
-	/* Result of the operation.
-	 * 0 on success.
-	 * A negative errno otherwise.
+	/**
+	 * @brief Result of the operation.
+	 *
+	 * Zero on success, a negative errno otherwise.
 	 */
 	int result;
-	/* Destination address where the operation was performed. */
+	/**
+	 * @brief Address in memory where the operation was performed.
+	 *
+	 */
 	uint32_t addr;
-	/* Pointer to the data that was written to non-volatile memory.
-	 * Used by @ref BM_STORAGE_EVT_WRITE_RESULT events.
+	/**
+	 * @brief Pointer to the data written to memory.
+	 *
+	 * Valid when the event is @ref BM_STORAGE_EVT_WRITE_RESULT.
 	 */
 	const void *src;
-	/* Length (in bytes) of the operation that was performed. */
+	/**
+	 * @brief Length of the operation.
+	 */
 	size_t len;
-	/* Pointer to user data, passed to the implementation-specific API function call. */
+	/**
+	 * @brief User-defined context.
+	 */
 	void *ctx;
 };
 
@@ -75,33 +89,34 @@ struct bm_storage_evt {
 typedef void (*bm_storage_evt_handler_t)(struct bm_storage_evt *evt);
 
 /**
- * @brief Information about the implementation-specific non-volatile memory.
+ * @brief Information about the non-volatile memory.
  */
 struct bm_storage_info {
 	/**
-	 * @brief Size of a page (in bytes). A page is the smallest unit that can be erased.
+	 * @brief Size of the smallest unit of memory that can be erased, in bytes.
 	 */
 	uint32_t erase_unit;
 	/**
-	 * @brief Value used by the implementation-specific backend to represent erased memory.
+	 * @brief Value used to represent erased memory.
 	 */
 	uint32_t erase_value;
 	/**
-	 * @brief Size of the smallest programmable unit (in bytes).
+	 * @brief Size of the smallest unit of memory that can be programmed, in bytes.
 	 */
 	uint32_t program_unit;
 	/**
-	 * @brief Specifies if the implementation-specific backend does not need erase.
+	 * @brief Whether the hardware requires memory to be erased, before it can be written.
 	 */
 	bool no_explicit_erase;
 };
 
+struct bm_storage;
+struct bm_storage_config;
+
 /**
  * @brief Storage instance.
  *
- * An instance is bound to an API implementation and contains information about the
- * non-volatile memory, such as the program and erase units, as well as the implementation-specific
- * functionality.
+ * An instance is bound to an API implementation (backend) and the partition on which it operates.
  */
 struct bm_storage {
 	/**
@@ -162,14 +177,11 @@ struct bm_storage_config {
 /**
  * @brief Initialize a storage instance.
  *
- * @note This function can be called multiple times on different storage instances in order to
- *       configure each of them separately for initialization.
- *
  * @param[in] storage Storage instance to initialize.
  * @param[in] config Configuration for the storage instance initialization.
  *
  * @retval 0 on success.
- * @retval -EFAULT If @p storage is @c NULL or @p config is @c NULL.
+ * @retval -EFAULT The storage instance @p storage, @p config or the API are @c NULL.
  * @retval -EIO If an implementation-specific internal error occurred.
  */
 int bm_storage_init(struct bm_storage *storage, const struct bm_storage_config *config);
@@ -181,13 +193,10 @@ int bm_storage_init(struct bm_storage *storage, const struct bm_storage_config *
  * If this instance has any outstanding operations, these will complete as normal and an
  * event will be sent to the instance's event handler.
  *
- * @note This function can be called multiple times on different storage instances in order to
- *       configure each of them separately for uninitialization.
- *
  * @param[in] storage Storage instance to uninitialize.
  *
  * @retval 0 on success.
- * @retval -EFAULT If @p storage is @c NULL.
+ * @retval -EFAULT The storage instance @p storage is @c NULL.
  * @retval -EPERM If @p storage is in an invalid state.
  * @retval -EBUSY If the implementation-specific backend is busy with an ongoing operation.
  * @retval -ENOTSUP If the backend does not support uninitialization.
@@ -195,7 +204,7 @@ int bm_storage_init(struct bm_storage *storage, const struct bm_storage_config *
 int bm_storage_uninit(struct bm_storage *storage);
 
 /**
- * @brief Read data from a storage instance.
+ * @brief Read data from storage.
  *
  * @param[in] storage Storage instance to read data from.
  * @param[in] src Address in non-volatile memory where to read data from.
@@ -203,16 +212,16 @@ int bm_storage_uninit(struct bm_storage *storage);
  * @param[in] len Length of the data to copy (in bytes).
  *
  * @retval 0 on success.
- * @retval -EFAULT If @p storage is @c NULL or if @p dest or @p src are not 32-bit word aligned,
- *                 or if they are outside the bounds of the memory region configured in @p storage.
- * @retval -EPERM If @p storage is in an invalid state or if the implementation-specific backend
- *                has not been initialized.
- * @retval -EINVAL If @p len is zero or not a multiple of @ref bm_storage_info.program_unit.
+ * @retval -EFAULT The storage instance @p storage or @p dest is @c NULL.
+ * @retval -EPERM The storage instance @p storage is not initialized.
+ * @retval -EINVAL If @p len is zero.
  */
 int bm_storage_read(const struct bm_storage *storage, uint32_t src, void *dest, uint32_t len);
 
 /**
- * @brief Write data to a storage instance.
+ * @brief Write data to storage.
+ *
+ * The write address and length must be a multiple of the backend's program unit.
  *
  * @param[in] storage Storage instance to write data to.
  * @param[in] dest Address in non-volatile memory where to write the data to.
@@ -222,20 +231,20 @@ int bm_storage_read(const struct bm_storage *storage, uint32_t src, void *dest, 
  *                Can be NULL.
  *
  * @retval 0 on success.
- * @retval -EFAULT If @p storage is @c NULL or if @p dest or @p src are not 32-bit word aligned,
- *                 or if they are outside the bounds of the memory region configured in @p storage.
- * @retval -EPERM If @p storage is in an invalid state or if the implementation-specific backend
- *                has not been initialized.
- * @retval -EINVAL If @p len is zero or not a multiple of @ref bm_storage_info.program_unit.
+ * @retval -EFAULT The storage instance @p storage or @p src is @c NULL.
+ * @retval -EPERM The storage instance @p storage is not initialized.
+ * @retval -EINVAL The @p dest or @p len parameters are unaligned.
  * @retval -ENOMEM Out of memory to perform the requested operation.
- * @retval -EBUSY If the implementation-specific backend is busy with an ongoing operation.
- * @retval -EIO If an implementation-specific internal error occurred.
+ * @retval -EBUSY The operation could not be accepted at this time.
+ * @retval -EIO An internal error has occurred.
  */
 int bm_storage_write(const struct bm_storage *storage, uint32_t dest, const void *src,
 		     uint32_t len, void *ctx);
 
 /**
- * @brief Erase data in a storage instance.
+ * @brief Erase data from storage.
+ *
+ * The erase address and length must be a multiple of the backend's erase unit.
  *
  * @param[in] storage Storage instance to erase data in.
  * @param[in] addr Address in non-volatile memory where to erase the data.
@@ -244,15 +253,13 @@ int bm_storage_write(const struct bm_storage *storage, uint32_t dest, const void
  *                Can be NULL.
  *
  * @retval 0 on success.
- * @retval -EFAULT If @p storage is @c NULL or if @p addr is outside the bounds of the memory region
- *                 configured in @p storage.
- * @retval -EPERM If @p storage is in an invalid state or if the implementation-specific backend
- *                has not been initialized.
- * @retval -EINVAL If @p len is zero or not a multiple of @ref bm_storage_info.erase_unit.
- * @retval -ENOMEM Out of memory to perform the requested operation.
- * @retval -EBUSY If the implementation-specific backend is busy with an ongoing operation.
- * @retval -ENOTSUP If the implementation-specific backend does not implement this function.
- * @retval -EIO If an implementation-specific internal error occurred.
+ * @retval -EFAULT The storage instance @p storage is @c NULL.
+ * @retval -EPERM The storage instance @p storage is not initialized.
+ * @retval -EINVAL The @p addr or @p len parameters are unaligned.
+* @retval -ENOMEM Out of memory to perform the requested operation.
+* @retval -EBUSY The operation could not be accepted at this time.
+* @retval -ENOTSUP If the implementation-specific backend does not implement this function.
+* @retval -EIO An internal error has occurred.
  */
 int bm_storage_erase(const struct bm_storage *storage, uint32_t addr, uint32_t len, void *ctx);
 
@@ -261,8 +268,8 @@ int bm_storage_erase(const struct bm_storage *storage, uint32_t addr, uint32_t l
  *
  * @param[in] storage Storage instance to query the status of.
  *
- * @retval true If the storage instance is busy, or not initialized.
- * @retval false If the storage instance is not busy, or the operation is not supported.
+ * @retval true The storage instance is busy.
+ * @retval false The storage instance is not busy, or it is uninitialized or @c NULL.
  */
 bool bm_storage_is_busy(const struct bm_storage *storage);
 

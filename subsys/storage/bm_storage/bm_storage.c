@@ -7,6 +7,7 @@
 #include <errno.h>
 #include <string.h>
 #include <zephyr/kernel.h>
+#include <zephyr/sys/util.h>
 #include <sys/types.h>
 #include <bm/storage/bm_storage.h>
 #include <bm/storage/bm_storage_backend.h>
@@ -27,11 +28,11 @@ __weak bool bm_storage_backend_is_busy(const struct bm_storage *storage)
 	return false;
 }
 
-static inline bool is_within_bounds(off_t addr, size_t len, off_t boundary_start,
-				    size_t boundary_size)
+static bool is_within_bounds(off_t addr, size_t len, off_t boundary_start, size_t boundary_size)
 {
-	return (addr >= boundary_start && (addr < (boundary_start + boundary_size)) &&
-		(len <= (boundary_start + boundary_size - addr)));
+	return (addr >= boundary_start &&
+			(addr < (boundary_start + boundary_size)) &&
+			(len <= (boundary_start + boundary_size - addr)));
 }
 
 int bm_storage_init(struct bm_storage *storage, const struct bm_storage_config *config)
@@ -102,8 +103,8 @@ int bm_storage_read(const struct bm_storage *storage, uint32_t src, void *dest, 
 	}
 
 	if (!is_within_bounds(src, len, storage->start_addr,
-		storage->end_addr - storage->start_addr)) {
-		return -EFAULT;
+			      storage->end_addr - storage->start_addr)) {
+		return -EINVAL;
 	}
 
 	return bm_storage_backend_read(storage, src, dest, len);
@@ -120,13 +121,14 @@ int bm_storage_write(const struct bm_storage *storage, uint32_t dest, const void
 		return -EPERM;
 	}
 
-	if (len == 0 || len % storage->nvm_info->program_unit != 0) {
+	if (!IS_ALIGNED(dest, storage->nvm_info->program_unit) ||
+	    !IS_ALIGNED(len,  storage->nvm_info->program_unit)) {
 		return -EINVAL;
 	}
 
 	if (!is_within_bounds(dest, len, storage->start_addr,
-		storage->end_addr - storage->start_addr)) {
-		return -EFAULT;
+			      storage->end_addr - storage->start_addr)) {
+		return -EINVAL;
 	}
 
 	return bm_storage_backend_write(storage, dest, src, len, ctx);
@@ -150,13 +152,14 @@ int bm_storage_erase(const struct bm_storage *storage, uint32_t addr, uint32_t l
 		return -EIO;
 	}
 
-	if (len == 0 || len % storage->nvm_info->erase_unit != 0) {
+	if (!IS_ALIGNED(addr, storage->nvm_info->erase_unit) ||
+	    !IS_ALIGNED(len, storage->nvm_info->erase_unit)) {
 		return -EINVAL;
 	}
 
 	if (!is_within_bounds(addr, len, storage->start_addr,
 			      storage->end_addr - storage->start_addr)) {
-		return -EFAULT;
+		return -EINVAL;
 	}
 
 	return bm_storage_backend_erase(storage, addr, len, ctx);

@@ -293,8 +293,13 @@ void test_bm_storage_write_efault(void)
 	err = bm_storage_init(&storage, &config);
 	TEST_ASSERT_EQUAL(0, err);
 
+	/* Unaligned length */
+	err = bm_storage_write(&storage, PARTITION_START, buf, sizeof(buf) - 1, NULL);
+	TEST_ASSERT_EQUAL(-EINVAL, err);
+
+	/* Unaligned source */
 	err = bm_storage_write(&storage, PARTITION_START, buf + 1, sizeof(buf), NULL);
-	TEST_ASSERT_EQUAL(-EFAULT, err);
+	TEST_ASSERT_EQUAL(-EINVAL, err);
 }
 
 void test_bm_storage_write(void)
