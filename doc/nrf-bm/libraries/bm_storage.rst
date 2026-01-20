@@ -68,7 +68,6 @@ Erase
 =====
 
 Use the :c:func:`bm_storage_erase` function to erase a region in NVM.
-``len`` must be a multiple of the erase unit.
 The completion of the operation is reported by the :c:enum:`BM_STORAGE_EVT_ERASE_RESULT` event.
 When the erase operation is not supported by the hardware, the backend will emulate it by writing the memory's erased value to the NVM area.
 If not supported by the backend, the call may return ``-ENOTSUP``.

@@ -71,11 +71,6 @@ void bm_storage_sd_on_soc_evt(uint32_t evt, void *ctx);
 RING_BUF_DECLARE(sd_fifo, CONFIG_BM_STORAGE_BACKEND_SD_QUEUE_SIZE *
 		 sizeof(struct bm_storage_sd_op));
 
-static inline bool is_aligned32(uint32_t addr)
-{
-	return !(addr & 0x03);
-}
-
 static void event_send(const struct bm_storage_sd_op *op, uint32_t result)
 {
 	if (op->storage->evt_handler == NULL) {
@@ -85,7 +80,7 @@ static void event_send(const struct bm_storage_sd_op *op, uint32_t result)
 
 	/* Dispatch mode is determined by SoftDevice state, not by context. */
 	enum bm_storage_evt_dispatch_type dispatch_type =
-		bm_storage_sd.softdevice_is_enabled ? BM_STORAGE_EVT_DISPATCH_ASYNC : BM_STORAGE_EVT_DISPATCH_SYNC;
+		bm_storage_sd.softdevice_is_enabled ? BM_STORAGE_EVT_DISPATCH_MODE_ASYNC : BM_STORAGE_EVT_DISPATCH_MODE_SYNC;
 
 	struct bm_storage_evt evt = {
 		.id = BM_STORAGE_EVT_WRITE_RESULT,
