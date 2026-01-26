@@ -15,6 +15,7 @@
 #include <zephyr/irq.h>
 #include <zephyr/sys/atomic.h>
 #include <zephyr/sys/ring_buffer.h>
+#include <zephyr/toolchain.h>
 
 /* 128-bit word line. This is the optimal size to fully utilize RRAM 128-bit word line with ECC
  * (error correction code) and minimize ECC updates overhead, due to these updates happening
@@ -79,7 +80,7 @@ static void event_send(const struct bm_storage_sd_op *op, uint32_t result)
 	}
 
 	/* Dispatch mode is determined by SoftDevice state, not by context. */
-	enum bm_storage_evt_dispatch_type dispatch_type =
+	enum bm_storage_evt_dispatch_mode dispatch_type =
 		bm_storage_sd.softdevice_is_enabled ? BM_STORAGE_EVT_DISPATCH_MODE_ASYNC : BM_STORAGE_EVT_DISPATCH_MODE_SYNC;
 
 	struct bm_storage_evt evt = {

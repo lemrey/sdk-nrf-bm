@@ -146,6 +146,17 @@ struct bm_storage {
 	 *        field and @ref start_addr.
 	 */
 	uint32_t end_addr;
+	/**
+	 * @brief Instance flags.
+	 */
+	struct {
+		/**
+		 * @brief Automatically pad write operations up to the program unit.
+		 *
+		 * The padding value is the same as the contents of the NVM address being written to.
+		 */
+		uint8_t pad_write_operations : 1;
+	} flags;
 };
 
 /**
@@ -172,6 +183,17 @@ struct bm_storage_config {
 	 *        field and @ref start_addr.
 	 */
 	uint32_t end_addr;
+	/**
+	 * @brief Configuration flags.
+	 */
+	struct {
+		/**
+		 * @brief Automatically pad write operations up to the program unit.
+		 *
+		 * The padding value is the same as the contents of the NVM address being written to.
+		 */
+		uint8_t pad_write_operations : 1;
+	} flags;
 };
 
 /**

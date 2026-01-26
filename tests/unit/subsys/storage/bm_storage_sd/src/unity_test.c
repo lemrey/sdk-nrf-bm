@@ -282,7 +282,6 @@ void test_bm_storage_write(void)
 {
 	int err;
 	bool is_busy;
-	/* Write buffer size must be a multiple of the program unit. */
 	uint8_t buf[BLOCK_SIZE];
 	struct bm_storage storage = {0};
 	struct bm_storage_config config = {
@@ -321,7 +320,6 @@ void test_bm_storage_write(void)
 void test_bm_storage_write_retry_etimedout(void)
 {
 	int err;
-	/* Write buffer size must be a multiple of the program unit. */
 	uint8_t buf[BLOCK_SIZE];
 	struct bm_storage storage = {0};
 	struct bm_storage_config config = {
@@ -423,7 +421,6 @@ void test_bm_storage_write_queued(void)
 void test_bm_storage_write_retry_queued(void)
 {
 	int err;
-	/* Write buffer size must be a multiple of the program unit. */
 	uint8_t buf[BLOCK_SIZE];
 	struct bm_storage storage = {0};
 	struct bm_storage_config config = {

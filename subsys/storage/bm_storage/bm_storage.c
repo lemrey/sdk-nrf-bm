@@ -55,6 +55,7 @@ int bm_storage_init(struct bm_storage *storage, const struct bm_storage_config *
 	storage->evt_handler = config->evt_handler;
 	storage->start_addr = config->start_addr;
 	storage->end_addr = config->end_addr;
+	storage->flags.pad_write_operations = config->flags.pad_write_operations;
 
 	err = bm_storage_backend_init(storage);
 	if (err) {
@@ -121,8 +122,12 @@ int bm_storage_write(const struct bm_storage *storage, uint32_t dest, const void
 		return -EPERM;
 	}
 
-	if (!IS_ALIGNED(dest, storage->nvm_info->program_unit) ||
-	    !IS_ALIGNED(len,  storage->nvm_info->program_unit)) {
+	if (!IS_ALIGNED(dest, storage->nvm_info->program_unit)) {
+		return -EINVAL;
+	}
+
+	if (!IS_ALIGNED(len, storage->nvm_info->program_unit) &&
+	    !storage->flags.pad_write_operations) {
 		return -EINVAL;
 	}
 

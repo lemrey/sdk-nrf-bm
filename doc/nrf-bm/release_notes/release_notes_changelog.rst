@@ -77,6 +77,7 @@ Storage
 
    Added:
      * The :c:func:`bm_storage_nvm_info_get` function to retrieve NVM information, such as the size of the program unit and other.
+     * The capability to automatically pad write operations up to the program unit.
 
    Updated:
      * The :c:func:`bm_storage_init` function to return an error when the instance is already initialized.
