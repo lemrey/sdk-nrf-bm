@@ -246,8 +246,6 @@ int bm_storage_read(const struct bm_storage *storage, uint32_t src, void *dest, 
  *
  * The write address and length must be a multiple of the backend's program unit.
  *
- * The write address and length must be a multiple of the backend's program unit.
- *
  * @param[in] storage Storage instance to write data to.
  * @param[in] dest Address in non-volatile memory where to write the data to.
  * @param[in] src Data to be written.
@@ -271,8 +269,6 @@ int bm_storage_write(const struct bm_storage *storage, uint32_t dest, const void
  *
  * The erase address and length must be a multiple of the backend's erase unit.
  *
- * The erase address and length must be a multiple of the backend's erase unit.
- *
  * @param[in] storage Storage instance to erase data in.
  * @param[in] addr Address in non-volatile memory where to erase the data.
  * @param[in] len Length of the data to be erased (in bytes).
@@ -284,8 +280,8 @@ int bm_storage_write(const struct bm_storage *storage, uint32_t dest, const void
  *                has not been initialized.
  * @retval -EINVAL The @p addr or @p len parameters are unaligned.
  * @retval -ENOMEM Out of memory to perform the requested operation.
- * @retval -EBUSY If the implementation-specific backend is busy with an ongoing operation.
- * @retval -EIO If an implementation-specific internal error occurred.
+ * @retval -EBUSY The operation could not be accepted at this time.
+ * @retval -EIO An internal error has occurred.
  */
 int bm_storage_erase(const struct bm_storage *storage, uint32_t addr, uint32_t len, void *ctx);
 
