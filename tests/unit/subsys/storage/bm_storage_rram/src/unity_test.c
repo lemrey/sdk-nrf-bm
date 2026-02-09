@@ -459,8 +459,8 @@ void test_bm_storage_erase_eperm(void)
 	TEST_ASSERT_EQUAL(-EPERM, err);
 }
 
-/* RRAM backend has no_explicit_erase: erase returns -ENOTSUP. */
-void test_bm_storage_erase_enotsup(void)
+/* RRAM backend emulates erase by writing erase_value. */
+void test_bm_storage_erase_emulated(void)
 {
 	int err;
 	struct bm_storage storage = {0};
@@ -478,8 +478,13 @@ void test_bm_storage_erase_enotsup(void)
 	err = bm_storage_init(&storage, &config);
 	TEST_ASSERT_EQUAL(0, err);
 
+	__cmock_nrfx_rramc_bytes_write_ExpectAnyArgs();
+	__cmock_nrfx_rramc_bytes_write_IgnoreArg_address();
+	__cmock_nrfx_rramc_bytes_write_IgnoreArg_src();
+	__cmock_nrfx_rramc_bytes_write_IgnoreArg_num_bytes();
+
 	err = bm_storage_erase(&storage, PARTITION_START, BLOCK_SIZE, NULL);
-	TEST_ASSERT_EQUAL(-ENOTSUP, err);
+	TEST_ASSERT_EQUAL(0, err);
 
 	__cmock_nrfx_rramc_uninit_Expect();
 

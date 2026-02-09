@@ -195,11 +195,11 @@ void test_bm_storage_write_efault(void)
 
 	/* Operation is out of bounds. */
 	err = bm_storage_write(&storage, PARTITION_START - 1, input, sizeof(input), NULL);
-	TEST_ASSERT_EQUAL(-EFAULT, err);
+	TEST_ASSERT_EQUAL(-EINVAL, err);
 
 	/* Operation is out of bounds. */
 	err = bm_storage_write(&storage, PARTITION_START, input_large, sizeof(input_large), NULL);
-	TEST_ASSERT_EQUAL(-EFAULT, err);
+	TEST_ASSERT_EQUAL(-EINVAL, err);
 }
 
 void test_bm_storage_write_eperm(void)
@@ -283,11 +283,11 @@ void test_bm_storage_read_efault(void)
 
 	/* Operation is out of bounds. */
 	err = bm_storage_read(&storage, PARTITION_START - 1, output, sizeof(output));
-	TEST_ASSERT_EQUAL(-EFAULT, err);
+	TEST_ASSERT_EQUAL(-EINVAL, err);
 
 	/* Operation is out of bounds. */
 	err = bm_storage_read(&storage, PARTITION_START, output_large, sizeof(output_large));
-	TEST_ASSERT_EQUAL(-EFAULT, err);
+	TEST_ASSERT_EQUAL(-EINVAL, err);
 }
 
 void test_bm_storage_read_eperm(void)
@@ -362,11 +362,11 @@ void test_bm_storage_erase_efault(void)
 
 	/* Operation is out of bounds. */
 	err = bm_storage_erase(&storage, PARTITION_START - 1, BLOCK_SIZE, NULL);
-	TEST_ASSERT_EQUAL(-EFAULT, err);
+	TEST_ASSERT_EQUAL(-EINVAL, err);
 
 	/* Operation is out of bounds. */
 	err = bm_storage_erase(&storage, PARTITION_START, BLOCK_SIZE * 4, NULL);
-	TEST_ASSERT_EQUAL(-EFAULT, err);
+	TEST_ASSERT_EQUAL(-EINVAL, err);
 }
 
 void test_bm_storage_erase_eperm(void)
