@@ -41,6 +41,10 @@ int bm_storage_init(struct bm_storage *storage, const struct bm_storage_config *
 		return -EFAULT;
 	}
 
+	if (storage->initialized) {
+		return -EPERM;
+	}
+
 	if (bm_storage_info.program_unit == 0) {
 		return -EIO;
 	}
@@ -160,11 +164,11 @@ int bm_storage_erase(const struct bm_storage *storage, uint32_t addr, uint32_t l
 bool bm_storage_is_busy(const struct bm_storage *storage)
 {
 	if (!storage) {
-		return true;
+		return false;
 	}
 
 	if (!storage->initialized) {
-		return true;
+		return false;
 	}
 
 	return bm_storage_backend_is_busy(storage);

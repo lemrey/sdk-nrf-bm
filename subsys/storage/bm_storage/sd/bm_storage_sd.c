@@ -37,28 +37,29 @@ struct bm_storage_sd_op {
 	uint32_t offset;
 };
 
-enum bm_storage_sd_state {
-	/* No operations requested to the SoftDevice. */
-	BM_STORAGE_SD_STATE_IDLE,
-	/* A non-storage operation is pending. */
-	BM_STORAGE_SD_STATE_OP_PENDING,
-	/* An storage operation is executing. */
-	BM_STORAGE_SD_STATE_OP_EXECUTING,
-};
-
 static struct {
-	/* The module is initialized. */
-	bool is_init;
-	/* Ensures atomic access to various states. */
-	atomic_t operation_ongoing;
 	/* Internal storage state. */
-	enum bm_storage_sd_state state;
+	union {
+		enum {
+			/* Queue is idle. */
+			QUEUE_IDLE,
+			/* An operation is executing. */
+			QUEUE_RUNNING,
+			/* Waiting for an external operation to complete. */
+			QUEUE_WAITING,
+			/* Queue processing is paused. */
+			QUEUE_PAUSED,
+		} queue_state;
+		atomic_t atomic_state;
+	};
+	enum {
+		OP_NONE,
+		OP_EXECUTING,
+	} operation_state;
 	/* Number of times an operation has been retried on timeout. */
 	uint32_t retries;
 	/* The SoftDevice is enabled. */
 	bool sd_enabled;
-	/* A SoftDevice state change is impending. */
-	bool paused;
 	struct bm_storage_sd_op current_operation;
 } bm_storage_sd;
 
@@ -114,24 +115,32 @@ static uint32_t write_execute(const struct bm_storage_sd_op *op)
 	return sd_flash_write(dest, src, chunk_len_words);
 }
 
+static bool queue_load_next(void)
+{
+	uint32_t bytes;
+	unsigned int key;
+
+	key = irq_lock();
+	bytes = ring_buf_get(&sd_fifo, (uint8_t *)&bm_storage_sd.current_operation,
+			     sizeof(struct bm_storage_sd_op));
+	irq_unlock(key);
+
+	return (bytes == sizeof(struct bm_storage_sd_op));
+}
+
 static void queue_process(void)
 {
 	uint32_t ret;
-	unsigned int key;
 
-	if (bm_storage_sd.state == BM_STORAGE_SD_STATE_IDLE) {
-		key = irq_lock();
-		ret = ring_buf_get(&sd_fifo, (uint8_t *)&bm_storage_sd.current_operation,
-				   sizeof(struct bm_storage_sd_op));
-		irq_unlock(key);
-		if (ret != sizeof(struct bm_storage_sd_op)) {
-			/* No more operations left to be processed, unlock the resource. */
-			atomic_set(&bm_storage_sd.operation_ongoing, 0);
+	if (bm_storage_sd.operation_state == OP_NONE) {
+		if (!queue_load_next()) {
+			bm_storage_sd.queue_state = QUEUE_IDLE;
 			return;
 		}
 	}
 
-	bm_storage_sd.state = BM_STORAGE_SD_STATE_OP_EXECUTING;
+	bm_storage_sd.queue_state = QUEUE_RUNNING;
+	bm_storage_sd.operation_state = OP_EXECUTING;
 
 	ret = write_execute(&bm_storage_sd.current_operation);
 
@@ -150,25 +159,24 @@ static void queue_process(void)
 		break;
 	case NRF_ERROR_BUSY:
 		/* The SoftDevice is executing a non-volatile memory operation that was not
-		 * requested by the storage logic.
-		 * Stop processing the queue until a system event is received.
+		 * requested by this library. Stop processing the queue until an event is received.
 		 */
-		bm_storage_sd.state = BM_STORAGE_SD_STATE_OP_PENDING;
+		bm_storage_sd.queue_state = QUEUE_WAITING;
 		break;
 	default:
-		/* An error has occurred. We cannot proceed further with this operation. */
+		/* An error has occurred and we cannot proceed further with this operation.
+		 * Process the next operation in the queue.
+		 */
 		event_send(&bm_storage_sd.current_operation, true, -EIO);
-		/* Reset the internal state so we can accept other operations. */
-		bm_storage_sd.state = BM_STORAGE_SD_STATE_IDLE;
-		atomic_set(&bm_storage_sd.operation_ongoing, 0);
+		bm_storage_sd.operation_state = OP_NONE;
+		queue_process();
 		break;
 	}
 }
 
 static void queue_start(void)
 {
-	if ((atomic_cas(&bm_storage_sd.operation_ongoing, 0, 1)) &&
-	    (!bm_storage_sd.paused)) {
+	if (atomic_cas(&bm_storage_sd.atomic_state, QUEUE_IDLE, QUEUE_RUNNING)) {
 		queue_process();
 	}
 }
@@ -211,36 +219,22 @@ static bool on_operation_failure(const struct bm_storage_sd_op *op)
 
 int bm_storage_backend_init(struct bm_storage *storage)
 {
-	/* If it's already initialized, return early successfully.
-	 * This is to support more than one client initialization.
-	 */
-	if (bm_storage_sd.is_init) {
-		return 0;
-	}
-
-	/* Initialize the SoftDevice storage backend from one context only. */
-	if (!atomic_cas(&bm_storage_sd.operation_ongoing, 0, 1)) {
-		return -EBUSY;
-	}
-
 	sd_softdevice_is_enabled((uint8_t *)&bm_storage_sd.sd_enabled);
 
-	bm_storage_sd.state = BM_STORAGE_SD_STATE_IDLE;
+	return 0;
+}
 
-	bm_storage_sd.is_init = true;
-
-	atomic_set(&bm_storage_sd.operation_ongoing, 0);
-
+int bm_storage_backend_uninit(struct bm_storage *storage)
+{
+	/* Do not touch the internal state.
+	 * Let queued operations complete.
+	 */
 	return 0;
 }
 
 int bm_storage_backend_read(const struct bm_storage *storage, uint32_t src, void *dest,
 			    uint32_t len)
 {
-	if (!bm_storage_sd.is_init) {
-		return -EPERM;
-	}
-
 	/* SoftDevice expects this alignment. */
 	if (!is_aligned32(src)) {
 		return -EFAULT;
@@ -257,10 +251,6 @@ int bm_storage_backend_write(const struct bm_storage *storage, uint32_t dest,
 {
 	uint32_t written;
 	unsigned int key;
-
-	if (!bm_storage_sd.is_init) {
-		return -EPERM;
-	}
 
 	/* SoftDevice expects this alignment. */
 	if (!is_aligned32((uint32_t)src) || !is_aligned32(dest)) {
@@ -290,7 +280,7 @@ int bm_storage_backend_write(const struct bm_storage *storage, uint32_t dest,
 
 bool bm_storage_backend_is_busy(const struct bm_storage *storage)
 {
-	return (bm_storage_sd.state != BM_STORAGE_SD_STATE_IDLE);
+	return (bm_storage_sd.queue_state != QUEUE_IDLE);
 }
 
 #ifndef CONFIG_UNITY
@@ -298,18 +288,26 @@ static
 #endif
 int bm_storage_sd_on_state_evt(enum nrf_sdh_state_evt evt, void *ctx)
 {
+	/* Are we ready to change state? */
+	bool is_busy = false;
+
 	switch (evt) {
 	case NRF_SDH_STATE_EVT_ENABLE_PREPARE:
-	case NRF_SDH_STATE_EVT_DISABLE_PREPARE:
-		/* Only allow changing state when idle */
-		bm_storage_sd.paused = true;
-		return (bm_storage_sd.state != BM_STORAGE_SD_STATE_IDLE);
+	case NRF_SDH_STATE_EVT_DISABLE_PREPARE: {
+		/* Pause queue */
+		is_busy = (bm_storage_sd.queue_state == QUEUE_RUNNING);
+		bm_storage_sd.queue_state = QUEUE_PAUSED;
+		return is_busy;
+	}
 
 	case NRF_SDH_STATE_EVT_ENABLED:
 	case NRF_SDH_STATE_EVT_DISABLED:
+		__ASSERT_NO_MSG(bm_storage_sd.queue_state == QUEUE_IDLE ||
+				bm_storage_sd.queue_state == QUEUE_PAUSED);
+
 		/* Continue executing any operation still in the queue */
-		bm_storage_sd.paused = false;
 		bm_storage_sd.sd_enabled = (evt == NRF_SDH_STATE_EVT_ENABLED);
+		bm_storage_sd.queue_state = QUEUE_RUNNING;
 		queue_process();
 		return 0;
 
@@ -326,50 +324,63 @@ static
 #endif
 void bm_storage_sd_on_soc_evt(uint32_t evt, void *ctx)
 {
+	bool operation_finished;
+
 	if ((evt != NRF_EVT_FLASH_OPERATION_SUCCESS) &&
 	    (evt != NRF_EVT_FLASH_OPERATION_ERROR)) {
+		/* This is not a FLASH event, return immediately */
 		return;
 	}
 
-	switch (bm_storage_sd.state) {
-	case BM_STORAGE_SD_STATE_IDLE:
+	if (bm_storage_sd.queue_state == QUEUE_IDLE) {
+		/* We did not request any operation, ignore this event */
 		return;
-	case BM_STORAGE_SD_STATE_OP_PENDING:
-		break;
-	case BM_STORAGE_SD_STATE_OP_EXECUTING:
-		bool operation_finished = false;
-
-		switch (evt) {
-		case NRF_EVT_FLASH_OPERATION_SUCCESS:
-			operation_finished = on_operation_success(&bm_storage_sd.current_operation);
-			break;
-		case NRF_EVT_FLASH_OPERATION_ERROR:
-			operation_finished = on_operation_failure(&bm_storage_sd.current_operation);
-			break;
-		default:
-			break;
-		}
-
-		if (operation_finished) {
-			bm_storage_sd.state = BM_STORAGE_SD_STATE_IDLE;
-
-			/* We pass a pointer only when we call it manually for the synchronous
-			 * processing.
-			 */
-			bool is_sync = (ctx != NULL);
-
-			event_send(&bm_storage_sd.current_operation, is_sync,
-				   (evt == NRF_EVT_FLASH_OPERATION_SUCCESS) ? 0 : -ETIMEDOUT);
-		}
-		break;
-	default:
-		break;
 	}
-
-	if (!bm_storage_sd.paused) {
+	if (bm_storage_sd.queue_state == QUEUE_WAITING) {
+		/* We attempted to schedule an operation, but SoftDevice was busy.
+		 * Attempt to schedule the operation now.
+		 */
 		queue_process();
-	} else {
+		return;
+	}
+
+	/* An operation has progressed.
+	 * We need to send an event if it has completed.
+	 * Then, if we are not paused we try to process the next operation,
+	 * otherwise, we let the SoftDevice change state.
+	 */
+	operation_finished = false;
+
+	switch (evt) {
+	case NRF_EVT_FLASH_OPERATION_SUCCESS:
+		operation_finished = on_operation_success(&bm_storage_sd.current_operation);
+		break;
+	case NRF_EVT_FLASH_OPERATION_ERROR:
+		operation_finished = on_operation_failure(&bm_storage_sd.current_operation);
+		break;
+	}
+
+	if (operation_finished) {
+		/* Load a new operation next */
+		bm_storage_sd.operation_state = OP_NONE;
+
+		/* We pass a pointer only when we call it manually for the synchronous
+		 * processing.
+		 */
+		bool is_sync = (ctx != NULL);
+
+		event_send(&bm_storage_sd.current_operation, is_sync,
+			   (evt == NRF_EVT_FLASH_OPERATION_SUCCESS) ? 0 : -ETIMEDOUT);
+	}
+
+	if (bm_storage_sd.queue_state == QUEUE_PAUSED) {
+		/* Let SoftDevice state change happen now */
 		nrf_sdh_observer_ready(&sdh_state_evt);
+		return;
+	}
+	if (bm_storage_sd.queue_state == QUEUE_RUNNING) {
+		queue_process();
+		return;
 	}
 }
 NRF_SDH_SOC_OBSERVER(sdh_soc, bm_storage_sd_on_soc_evt, NULL, HIGH);
