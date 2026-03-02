@@ -4,11 +4,14 @@
  * SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
  */
 #include <stdint.h>
+#include <string.h>
 #include <nrf_sdm.h>
 #include <nrf_soc.h>
 #include <bm/softdevice_handler/nrf_sdh.h>
 #include <bm/bm_irq.h>
+#if defined(CONFIG_NRF_SDH_DISPATCH_MODEL_SCHED)
 #include <bm/bm_scheduler.h>
+#endif
 #include <zephyr/toolchain.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/atomic.h>
@@ -149,7 +152,17 @@ static int nrf_sdh_enable(void)
 	BUILD_ASSERT(IS_ENABLED(CONFIG_NRF_SDH_SOC_RAND_SEED));
 	extern void sdh_soc_rand_seed(uint32_t evt, void *ctx);
 	(void) sdh_soc_rand_seed(NRF_EVT_RAND_SEED_REQUEST, NULL);
-#endif /* CONFIG_NRF_SDH_DISPATCH_MODEL_SCHED */
+#elif defined(CONFIG_SOFTDEVICE_BSIM)
+	/* bsim: seed RNG with constant */
+	uint8_t seed[SD_RAND_SEED_SIZE];
+
+	memset(seed, 0x42, sizeof(seed));
+	err = sd_rand_seed_set(seed);
+	if (err) {
+		LOG_ERR("Failed to seed SoftDevice RNG, nrf_error %#x", err);
+		return -EINVAL;
+	}
+#endif
 
 	/* Enable event interrupt, the priority has already been set by the stack. */
 	NVIC_EnableIRQ((IRQn_Type)SD_EVT_IRQn);

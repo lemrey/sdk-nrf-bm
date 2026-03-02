@@ -12,7 +12,15 @@
 #include <bm/softdevice_handler/nrf_sdh_ble.h>
 #include <zephyr/logging/log.h>
 
+#if defined(CONFIG_SOFTDEVICE_BSIM)
+/* Bsim: the linkable SoftDevice uses a static buffer in the x86 process; the
+ * "application RAM start" is the end of that buffer. Use the SD-provided getter.
+ */
+extern uint32_t sd_ble_bsim_app_ram_start_get(void);
+#define APP_RAM_START sd_ble_bsim_app_ram_start_get()
+#else
 #define APP_RAM_START DT_REG_ADDR(DT_CHOSEN(zephyr_sram))
+#endif
 
 LOG_MODULE_DECLARE(nrf_sdh, CONFIG_NRF_SDH_LOG_LEVEL);
 

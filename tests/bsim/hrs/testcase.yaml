@@ -1,0 +1,20 @@
+#
+# Copyright (c) 2026 Nordic Semiconductor ASA
+#
+# SPDX-License-Identifier: LicenseRef-Nordic-5-Clause
+#
+# Two-peer BabbleSim HRS test (single binary, -testid=peripheral|central).
+# Twister builds this app, then pytest runs compile_hrs_bsim.sh and
+# tests_scripts/hrs_service.sh (both peers + PHY). Pass/fail = run script exit code.
+#
+tests:
+  bsim.hrs:
+    platform_allow:
+      - nrf54l15bsim/nrf54l15/cpuapp
+    tags:
+      - bluetooth
+      - bsim
+    harness: pytest
+    harness_config:
+      pytest_dut_scope: session
+    timeout: 60
